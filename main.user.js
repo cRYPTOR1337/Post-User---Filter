@@ -150,14 +150,18 @@ $(document).ready(function(){
 			});
 		});
 	};
-
-	var count = 0;
-	$(filterSettings.tags).each(function(index){
-		searchObjectFactory.createSearchObject(filterSettings.tags[index], function(){
-			++count;
-			if( filterSettings.tags.length == count){
-				p.Stream.prototype._load();
-			}
+	
+	if( filterSettings.tags.length == 0){
+		p.Stream.prototype._load();
+	}else{
+		var count = 0;
+		$(filterSettings.tags).each(function(index){
+			searchObjectFactory.createSearchObject(filterSettings.tags[index], function(){
+				++count;
+				if( filterSettings.tags.length == count){
+					p.Stream.prototype._load();
+				}
+			});
 		});
-	});
+	}
 });
