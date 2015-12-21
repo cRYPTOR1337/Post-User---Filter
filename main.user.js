@@ -2,7 +2,7 @@
 // @name         pr0 filter
 // @description  filters by tags
 // @namespace    filter
-// @version      1.1
+// @version      1.1.0.1
 // @author       cRYPTOR
 // @match        https://pr0gramm.com/*
 // @match        http://pr0gramm.com/*
@@ -182,7 +182,7 @@ $(document).ready(function(){
 		}
 	}
 
-	if(filterSettings.tags > 0){
+	if(filterSettings.tags.length > 0){
 		var count = 0;
 		$(filterSettings.tags).each(function(i,t){
 			searchObjectFactory.createSearchObject(t, function(){
