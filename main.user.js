@@ -2,7 +2,7 @@
 // @name         pr0 filter
 // @description  filters by tags
 // @namespace    filter
-// @version      1.1.0.1
+// @version      1.1.0.2
 // @author       cRYPTOR
 // @match        https://pr0gramm.com/*
 // @match        http://pr0gramm.com/*
@@ -99,14 +99,10 @@ $(document).ready(function(){
 			$(inData.data.items).each(function(iIndex, i){
 
 				$(searchObjects).each(function(sOIndex, sO){
-
-					if( up2Date[sOIndex] != undefined ||
-					 	!sO.needsUpdate(i.id) ){
-						return;
+					if( up2Date[sOIndex] != 1 && sO.needsUpdate(i.id) ){
+						up2Date[sOIndex] = 1;
+						sO.update(updateAll, inData);
 					}
-
-					up2Date[sOIndex] = 1;
-					sO.update(updateAll, inData);
 				});
 
 				if( up2Date.length == searchObjects.length){
@@ -162,6 +158,11 @@ $(document).ready(function(){
 
 	var softReload = function(){
 
+		var isMainSite = document.location.pathname.indexOf('top') > -1 || document.location.pathname.indexOf('new') > -1;
+		if( !isMainSite){
+			return;
+		}
+
 		if( p.currentView.loadInProgress ){
 			setTimeout(softReload,10);
 			return;
@@ -172,7 +173,8 @@ $(document).ready(function(){
 			p.currentView.hideItem();
 		}
 
-		p.currentView.show({});
+		var isTop = document.location.pathname.indexOf('top') > -1;
+		p.currentView.show({tab:isTop ? 'top' : 'new'});
 
 		if($currentItem != undefined){
 			$currentItem = $('#' + $currentItem[0].id);
