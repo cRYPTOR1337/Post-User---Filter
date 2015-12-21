@@ -2,28 +2,29 @@
 // @name         pr0 filter
 // @description  filters by tags
 // @namespace    filter
-// @version      1.0
+// @version      1.1
 // @author       cRYPTOR
 // @match        https://pr0gramm.com/*
 // @match        http://pr0gramm.com/*
+// @grant		 none
 // ==/UserScript==
 
 $(document).ready(function(){
 
-	// '0' : 'Schwuchtel',
-	// '1' : 'Neuschwuchtel',
-	// '2' : 'Altschwuchtel',
-	// '3' : 'Admin',
-	// '4' : 'Gesperrt',
-	// '5' : 'Moderator',
-	// '6' : 'Fliesentischbesitzer',
-	// '7' : 'Lebende Legende',
-	// '8' : 'pr0wichtler',
-	// '9' : 'Edler Spender',
-
 	var filterSettings = {
-		tags: [],
-		marks: [ 6 ],
+		tags: ['repost', 'wichtel', 'star wars'],
+		marks: {
+			'0':0, // Schwuchtel
+			'1':0, // Neuschwuchtel
+			'2':0, // Altschwuchtel
+			'3':0, // Admin
+			'4':0, // Gesperrt
+			'5':0, // Moderator
+			'6':1, // Fliesentischbesitzer
+			'7':0, // Lebende Legende
+			'8':0, // pr0wichtler
+			'9':0, // Edler Spender
+		},
 		debug: false,
 	};
 
@@ -48,13 +49,13 @@ $(document).ready(function(){
 				},
 				min: 0,
 				max: 0,
-				ids: [],
+				ids: {},
 				is: function(id){
 					if( id > this.max )
 						return false;
 					if( id < this.min )
 						debugLog('error!');
-					return ( this.ids.indexOf(id) != -1 );
+					return this.ids[id] != undefined;
 				},
 				needsUpdate: function(id){
 					return id < this.min;
@@ -70,16 +71,13 @@ $(document).ready(function(){
 							o.max = 0;
 							o.min = Number.MAX_VALUE;
 
-							$(data.items).each(function(index){
-								var id = data.items[index].id;
-
+							$(data.items).each(function(iIndex, i){
+								var id = i.id;
 								if( id > o.max)
 									o.max = id;
 								if( id < o.min)
 									o.min = id;
-
-								o.ids.push(id);
-
+								o.ids[id] = 1;
 							});
 
 							o.searchOptions.older = o.min;
@@ -95,23 +93,29 @@ $(document).ready(function(){
 	};
 
 	var updateAll = function(inData){
-		var isUp2Date = true;
-		$(inData.data.items).each(function(itemIndex){
-			if( !isUp2Date){
-				return;
-			}
-			$(searchObjects).each(function(index){
-				if( !isUp2Date){
-					return;
-				}
-				var o = searchObjects[index];
-				if( o.needsUpdate(inData.data.items[itemIndex].id)){
-					isUp2Date = false;
-					o.update(updateAll, inData);
+		var up2Date = [];
+
+		if( searchObjects.length > 0){
+			$(inData.data.items).each(function(iIndex, i){
+
+				$(searchObjects).each(function(sOIndex, sO){
+
+					if( up2Date[sOIndex] != undefined ||
+					 	!sO.needsUpdate(i.id) ){
+						return;
+					}
+
+					up2Date[sOIndex] = 1;
+					sO.update(updateAll, inData);
+				});
+
+				if( up2Date.length == searchObjects.length){
+					return false;
 				}
 			});
-		});
-		if( isUp2Date ){
+		}
+
+		if( up2Date.length == 0 ){
 			call(inData.callback);
 		}
 	};
@@ -126,22 +130,27 @@ $(document).ready(function(){
 				'data' : data,
 				'callback' : function(){
 
+					var oldLength = data.items.length;
+
+					data.items = $.grep(data.items, function(el, i){
+						return filterSettings.marks[el.mark] == 0;
+					});
+
 					if(searchObjects.length > 0){
 						data.items = $.grep(data.items, function(el, i){
-							var alive = true;
-							$(searchObjects).each(function(index){
-								if( searchObjects[index].is(el.id) ){
-									return alive = false;
+							var keep = true;
+							$(searchObjects).each(function(sOIndex, sO){
+								if( sO.is(el.id) ){
+									return keep = false;
 								}
 							});
-							return alive;
+							return keep;
 						});
 					}
 
-					if( filterSettings.marks.length > 0 ){
-						data.items = $.grep(data.items, function(el, i){
-							return filterSettings.marks.indexOf(el.mark) == -1;
-						});
+					var dif = oldLength - data.items.length;
+					if( dif > 0 ){
+						debugLog('filtered ' + dif + ' items!');
 					}
 
 					var position = stream._processResponse(data);
@@ -149,19 +158,41 @@ $(document).ready(function(){
 				}
 			});
 		});
-	};
-	
-	if( filterSettings.tags.length == 0){
-		p.Stream.prototype._load();
-	}else{
+	};	
+
+	var softReload = function(){
+
+		if( p.currentView.loadInProgress ){
+			setTimeout(softReload,10);
+			return;
+		}
+
+		var $currentItem = p.currentView.$currentItem;
+		if($currentItem != undefined){
+			p.currentView.hideItem();
+		}
+
+		p.currentView.show({});
+
+		if($currentItem != undefined){
+			$currentItem = $('#' + $currentItem[0].id);
+			if($currentItem[0] != undefined){
+				p.currentView.showItem($currentItem, 1);
+			}		
+		}
+	}
+
+	if(filterSettings.tags > 0){
 		var count = 0;
-		$(filterSettings.tags).each(function(index){
-			searchObjectFactory.createSearchObject(filterSettings.tags[index], function(){
+		$(filterSettings.tags).each(function(i,t){
+			searchObjectFactory.createSearchObject(t, function(){
 				++count;
-				if( filterSettings.tags.length == count){
-					p.Stream.prototype._load();
+				if( count == searchObjects.length){
+					softReload();
 				}
 			});
 		});
+	}else{
+		softReload();
 	}
 });
