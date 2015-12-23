@@ -2,7 +2,7 @@
 // @name         pr0 filter
 // @description  filters by tags
 // @namespace    filter
-// @version      1.1.0.3
+// @version      1.1.0.4
 // @author       cRYPTOR
 // @match        *://pr0gramm.com/*
 // @grant		 none
@@ -127,7 +127,7 @@ $(document).ready(function(){
 		p.api.get('items.get', p.merge(options, this.options), function (data){
 
 			promoted = stream.options.promoted;
-			if( stream.options.tags != undefined ){
+			if( stream.options.tags != undefined || stream.options.user != undefined ){
 				var position = stream._processResponse(data);
 				callback(data.items, position, data.error);
 				return;
