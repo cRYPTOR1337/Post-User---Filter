@@ -2,17 +2,16 @@
 // @name         pr0 filter
 // @description  filters by tags
 // @namespace    filter
-// @version      1.1.0.2
+// @version      1.1.0.3
 // @author       cRYPTOR
-// @match        https://pr0gramm.com/*
-// @match        http://pr0gramm.com/*
+// @match        *://pr0gramm.com/*
 // @grant		 none
 // ==/UserScript==
 
 $(document).ready(function(){
 
 	var filterSettings = {
-		tags: ['repost', 'wichtel', 'star wars'],
+		tags: ['wichtel', 'repost'],
 		marks: {
 			'0':0, // Schwuchtel
 			'1':0, // Neuschwuchtel
@@ -40,79 +39,83 @@ $(document).ready(function(){
 		}
 	};
 
+	var promoted = false;
+	var getId = function(e){
+		return promoted ? e.promoted : e.id;
+	}
+
 	var searchObjects = [];
 	var searchObjectFactory = {
 		createSearchObject : function(content, callback){
-			searchObjects[searchObjects.push({
+			searchObjects.push({
+				searchContainers: [],
 				searchOptions:{
 					'tags':content
 				},
-				min: 0,
-				max: 0,
 				ids: {},
 				is: function(id){
-					if( id > this.max )
-						return false;
-					if( id < this.min )
-						debugLog('error!');
 					return this.ids[id] != undefined;
 				},
 				needsUpdate: function(id){
-					return id < this.min;
+					return !this.containerContains(id);
 				},
-				update: function(callback, callbackData){
+				containerContains: function(id){
+					var toReturn = true;
+					$(this.searchContainers).each(function(i,e){
+						if( id >= e.min && id <= e.max ){
+							return toReturn = false;
+						}
+					});
+					return !toReturn;
+				},
+				update: function(id, callback, callbackData){
 
 					var o = this;
-					o.searchOptions.flags = p.user.flags
+					o.searchOptions.flags = p.user.flags;
+					o.searchOptions.older = id;
+					o.searchOptions.promoted = promoted;
 
 					p.api.get('items.get', o.searchOptions, function(data){
-						if( data.items.length > 0){
-
-							o.max = 0;
-							o.min = Number.MAX_VALUE;
-
-							$(data.items).each(function(iIndex, i){
-								var id = i.id;
-								if( id > o.max)
-									o.max = id;
-								if( id < o.min)
-									o.min = id;
-								o.ids[id] = 1;
-							});
-
-							o.searchOptions.older = o.min;
-							debugLog(o.searchOptions.older);
-						}else{
-							o.min = -1;
+						var c = o.searchContainers[o.searchContainers.push({max:id,min:Number.MAX_VALUE})-1];
+						if(data.items.length == 0) {
+							c.min = -1;
+							return call(callback, callbackData);
 						}
-						call(callback, callbackData);
+						$(data.items).each(function(i, e){
+							var id = getId(e);
+							if( id < c.min){
+								c.min = id;
+							}
+							o.ids[id] = 1;
+						});
+						return call(callback, callbackData);
 					});
 				}
-			}) - 1].update(callback);
+			});
+			call(callback);
 		}
 	};
 
-	var updateAll = function(inData){
-		var up2Date = [];
-
-		if( searchObjects.length > 0){
-			$(inData.data.items).each(function(iIndex, i){
-
-				$(searchObjects).each(function(sOIndex, sO){
-					if( up2Date[sOIndex] != 1 && sO.needsUpdate(i.id) ){
-						up2Date[sOIndex] = 1;
-						sO.update(updateAll, inData);
-					}
-				});
-
-				if( up2Date.length == searchObjects.length){
-					return false;
+	var updateAll = function(d){		
+		if( searchObjects.length == 0){
+			return call(d.callback);
+		}
+		var isUp2Date = true;
+		$(d.data.items).each(function(iIndex, i){		
+			if(!isUp2Date){
+				return false;	
+			}
+			$(searchObjects).each(function(sOIndex, sO){
+				var id = getId(i);
+				if( sO.needsUpdate(id)){
+					sO.update(id, updateAll, d);
+					return isUp2Date = false;
 				}
 			});
-		}
+		});
 
-		if( up2Date.length == 0 ){
-			call(inData.callback);
+		if( isUp2Date ){
+			call(d.callback);
 		}
 	};
 
@@ -122,12 +125,19 @@ $(document).ready(function(){
 		options.flags = p.user.flags;
 
 		p.api.get('items.get', p.merge(options, this.options), function (data){
+
+			promoted = stream.options.promoted;
+			if( stream.options.tags != undefined ){
+				var position = stream._processResponse(data);
+				callback(data.items, position, data.error);
+				return;
+			}
+
 			updateAll({ 
 				'data' : data,
 				'callback' : function(){
 
 					var oldLength = data.items.length;
-
 					data.items = $.grep(data.items, function(el, i){
 						return filterSettings.marks[el.mark] == 0;
 					});
@@ -158,8 +168,10 @@ $(document).ready(function(){
 
 	var softReload = function(){
 
-		var isMainSite = document.location.pathname.indexOf('top') > -1 || document.location.pathname.indexOf('new') > -1;
-		if( !isMainSite){
+		var pathName = document.location.pathname;
+		if( !(pathName.indexOf('top') > -1 
+		   || pathName.indexOf('new') > -1 
+		   || pathName == '/') ){
 			return;
 		}
 
@@ -173,7 +185,7 @@ $(document).ready(function(){
 			p.currentView.hideItem();
 		}
 
-		var isTop = document.location.pathname.indexOf('top') > -1;
+		var isTop = pathName.indexOf('top') > -1;
 		p.currentView.show({tab:isTop ? 'top' : 'new'});
 
 		if($currentItem != undefined){
